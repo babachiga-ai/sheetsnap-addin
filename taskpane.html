@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SheetSnap</title>
+
+  <!-- Office JavaScript API -->
+  <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #07090f;
+      --card:     #0d1117;
+      --raised:   #131a24;
+      --border:   #1e2d40;
+      --bhi:      #2a3f58;
+      --green:    #10b981;
+      --green-lo: rgba(16,185,129,0.11);
+      --green-gl: rgba(16,185,129,0.22);
+      --blue:     #3b82f6;
+      --amber:    #f59e0b;
+      --rose:     #f43f5e;
+      --t1: #eef2f7;
+      --t2: #8899aa;
+      --t3: #4a5a6a;
+      --font: -apple-system, 'Segoe UI', 'Inter', sans-serif;
+      --mono: 'Consolas', 'JetBrains Mono', monospace;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      font-family: var(--font);
+      color: var(--t1);
+      overflow-x: hidden;
+    }
+
+    body { padding-bottom: 20px; }
+
+    /* ── HEADER ─────────────────────────────── */
+    .hdr {
+      display: flex; align-items: center; gap: 11px;
+      padding: 18px 16px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo {
+      width: 38px; height: 38px; flex-shrink: 0;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 19px;
+      box-shadow: 0 0 16px rgba(16,185,129,0.28), 0 2px 8px rgba(0,0,0,0.4);
+    }
+    .hdr-text h1 { font-size: 15px; font-weight: 700; letter-spacing: -.3px; }
+    .hdr-text .sub { font-size: 10px; color: var(--t3); font-family: var(--mono); margin-top: 1px; }
+    .ver {
+      margin-left: auto;
+      padding: 2px 8px;
+      background: var(--raised);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 9px; font-family: var(--mono); color: var(--t3);
+    }
+
+    /* ── SELECTION STATUS ───────────────────── */
+    .sel-status {
+      margin: 14px 16px 0;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      transition: border-color .25s;
+    }
+    .sel-status.ready { border-color: rgba(16,185,129,.35); }
+    .sel-status.empty { border-color: var(--border); }
+    .sel-status.error { border-color: rgba(244,63,94,.35); }
+
+    .sel-row { display: flex; align-items: center; gap: 9px; }
+    .sel-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--t3); flex-shrink: 0;
+      position: relative;
+    }
+    .sel-dot.on {
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green-gl);
+    }
+    .sel-dot.on::after {
+      content: ''; position: absolute; inset: -3px;
+      border-radius: 50%; border: 1px solid var(--green);
+      opacity: .4; animation: ping 1.8s ease-out infinite;
+    }
+    @keyframes ping { 0%{transform:scale(1);opacity:.4} 100%{transform:scale(2.4);opacity:0} }
+
+    .sel-addr { font-size: 13px; font-weight: 600; font-family: var(--mono); }
+    .sel-dims { font-size: 10.5px; color: var(--t3); margin-top: 3px; font-family: var(--mono); }
+    .sel-hint { font-size: 11px; color: var(--t2); margin-top: 6px; line-height: 1.4; }
+
+    /* ── SECTION ────────────────────────────── */
+    .sec { padding: 14px 16px 0; }
+    .sec-lbl {
+      font-size: 9.5px; font-weight: 600;
+      letter-spacing: .1em; text-transform: uppercase;
+      color: var(--t3); margin-bottom: 7px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .sec-lbl::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* ── SETTINGS ROWS ──────────────────────── */
+    .srow {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; padding: 9px 12px;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      margin-bottom: 6px;
+    }
+    .srow:last-child { margin-bottom: 0; }
+    .sl { font-size: 12px; font-weight: 500; }
+    .sh { font-size: 10px; color: var(--t3); font-family: var(--mono); margin-top: 1px; }
+
+    .pills {
+      display: flex; gap: 3px;
+      background: #060810; border: 1px solid var(--border);
+      border-radius: 7px; padding: 3px; flex-shrink: 0;
+    }
+    .pill {
+      padding: 5px 10px; border-radius: 5px;
+      font-size: 10.5px; font-family: var(--mono); font-weight: 500;
+      color: var(--t3); background: transparent; border: none; cursor: pointer;
+      transition: all .15s;
+    }
+    .pill:hover { color: var(--t1); }
+    .pill.active { background: var(--raised); color: var(--t1); box-shadow: 0 1px 3px rgba(0,0,0,.5); }
+    [data-q="low"].active    { color: var(--t2); }
+    [data-q="medium"].active { color: var(--amber); }
+    [data-q="high"].active   { color: var(--green); }
+    [data-fmt].active { color: var(--blue); }
+
+    /* ── CAPTURE BUTTON ─────────────────────── */
+    .cap-wrap { padding: 16px 16px 12px; }
+    .cap-btn {
+      width: 100%; border: none; border-radius: 11px; cursor: pointer;
+      background: linear-gradient(135deg, #10b981, #059669 60%, #0d9488);
+      box-shadow: 0 0 0 1px rgba(16,185,129,.28), 0 4px 22px rgba(16,185,129,.18);
+      position: relative; overflow: hidden; transition: all .18s;
+    }
+    .cap-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 0 0 1px rgba(16,185,129,.45), 0 8px 28px rgba(16,185,129,.28);
+    }
+    .cap-btn:disabled { background: var(--raised); box-shadow: none; cursor: not-allowed; }
+    .cap-btn::after {
+      content: ''; position: absolute; top: 0; left: -80%; width: 55%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.14), transparent);
+      transform: skewX(-18deg); transition: left .55s;
+    }
+    .cap-btn:hover:not(:disabled)::after { left: 150%; }
+    .btn-inner {
+      position: relative; z-index: 1;
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      padding: 13px 18px;
+    }
+    .bi { font-size: 16px; }
+    .bl { font-size: 13.5px; font-weight: 700; color: #fff; letter-spacing: -.15px; }
+    .cap-btn:disabled .bl { color: var(--t3); }
+    .cap-btn:disabled .bi { opacity: .3; }
+    .bspinner {
+      width: 17px; height: 17px;
+      border: 2px solid rgba(255,255,255,.2); border-top-color: #fff;
+      border-radius: 50%; display: none; animation: spin .65s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .cap-btn.loading .bi, .cap-btn.loading .bl { display: none; }
+    .cap-btn.loading .bspinner { display: block; }
+
+    /* ── PROGRESS ───────────────────────────── */
+    .prog { padding: 0 16px 6px; display: none; }
+    .prog.on { display: block; }
+    .prog-hd { display: flex; justify-content: space-between; margin-bottom: 5px; }
+    .prog-lbl { font-size: 10px; color: var(--t2); font-family: var(--mono); }
+    .prog-pct { font-size: 10px; color: var(--green); font-family: var(--mono); font-weight: 500; }
+    .prog-track { height: 3px; background: var(--raised); border-radius: 3px; overflow: hidden; }
+    .prog-fill {
+      height: 100%; border-radius: 3px; width: 0%;
+      background: linear-gradient(90deg, var(--green), var(--blue));
+      transition: width .3s ease;
+    }
+
+    /* ── PREVIEW ────────────────────────────── */
+    .preview-wrap {
+      padding: 4px 16px 16px;
+      display: none;
+    }
+    .preview-wrap.on { display: block; }
+    .preview-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px;
+    }
+    .preview-card img {
+      width: 100%; border-radius: 6px; display: block;
+      border: 1px solid var(--border);
+    }
+    .preview-actions {
+      display: flex; gap: 8px; margin-top: 10px;
+    }
+    .ghost-btn {
+      flex: 1; background: var(--raised); border: 1px solid var(--border);
+      color: var(--t1); border-radius: 8px; padding: 8px; font-size: 12px;
+      font-weight: 600; cursor: pointer; font-family: var(--font);
+      transition: all .15s;
+    }
+    .ghost-btn:hover { border-color: var(--bhi); }
+
+    /* ── FOOTER ─────────────────────────────── */
+    .divider { height: 1px; background: var(--border); margin-top: 6px; }
+    .ftr {
+      padding: 9px 16px 4px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .fl, .fr { font-size: 9.5px; color: var(--t3); font-family: var(--mono); }
+
+    /* ── TOAST ──────────────────────────────── */
+    .toast {
+      position: fixed; bottom: 14px; left: 50%;
+      transform: translateX(-50%) translateY(48px);
+      background: var(--raised); border: 1px solid var(--border);
+      border-radius: 9px; padding: 9px 16px;
+      font-size: 11.5px; font-family: var(--mono);
+      white-space: pre-line; text-align: center; z-index: 999; opacity: 0;
+      pointer-events: none; max-width: 90%;
+      transition: transform .3s cubic-bezier(.34,1.56,.64,1), opacity .3s;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    .toast.ok  { border-color: rgba(16,185,129,.4); color: var(--green); }
+    .toast.err { border-color: rgba(244,63,94,.4);  color: var(--rose); }
+    .toast.inf { border-color: rgba(59,130,246,.4); color: var(--blue); }
+
+    @keyframes fi { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:none} }
+    .hdr { animation: fi .25s ease both; }
+    .sel-status { animation: fi .25s .04s ease both; }
+    .sec { animation: fi .25s .08s ease both; }
+    .cap-wrap { animation: fi .25s .14s ease both; }
+  </style>
+</head>
+<body>
+
+<!-- Boot diagnostics — visible the instant the page loads, before any
+     script runs. If Office.js or taskpane.js fails, this stays visible
+     with a clear reason instead of a blank/broken panel. -->
+<div id="bootError" style="display:none; margin:16px; padding:14px 16px; background:#1a0d10; border:1px solid #f43f5e; border-radius:10px; font: 500 12px -apple-system,'Segoe UI',sans-serif; color:#ff8fa3; line-height:1.5;"></div>
+
+<div class="hdr">
+  <div class="logo">📷</div>
+  <div class="hdr-text">
+    <h1>SheetSnap</h1>
+    <div class="sub">Copy Selection as Picture</div>
+  </div>
+  <div class="ver">v1.0</div>
+</div>
+
+<div class="sel-status empty" id="selStatus">
+  <div class="sel-row">
+    <div class="sel-dot" id="selDot"></div>
+    <div>
+      <div class="sel-addr" id="selAddr">No selection</div>
+      <div class="sel-dims" id="selDims">—</div>
+    </div>
+  </div>
+  <div class="sel-hint" id="selHint">Select a range of cells in your worksheet, then click Refresh.</div>
+</div>
+
+<div class="sec">
+  <div class="sec-lbl">Settings</div>
+
+  <div class="srow">
+    <div>
+      <div class="sl">Format</div>
+      <div class="sh">Output file type</div>
+    </div>
+    <div class="pills" id="fmtPills">
+      <button class="pill active" data-fmt="png">PNG</button>
+      <button class="pill" data-fmt="jpeg">JPG</button>
+    </div>
+  </div>
+
+  <div class="srow">
+    <div>
+      <div class="sl">Quality</div>
+      <div class="sh">Image resolution</div>
+    </div>
+    <div class="pills" id="qualPills">
+      <button class="pill" data-q="low">Low</button>
+      <button class="pill active" data-q="medium">Medium</button>
+      <button class="pill" data-q="high">High</button>
+    </div>
+  </div>
+</div>
+
+<div class="cap-wrap">
+  <button class="cap-btn" id="refreshBtn" style="margin-bottom:8px; background: linear-gradient(135deg,#1a2433,#131a24); box-shadow:0 0 0 1px var(--border);">
+    <div class="btn-inner">
+      <span class="bi">🔄</span>
+      <span class="bl" style="color:var(--t1);">Refresh Selection</span>
+    </div>
+  </button>
+  <button class="cap-btn" id="capBtn" disabled>
+    <div class="btn-inner">
+      <span class="bi">⚡</span>
+      <span class="bl" id="btnLabel">Capture as Picture</span>
+      <div class="bspinner"></div>
+    </div>
+  </button>
+</div>
+
+<div class="prog" id="prog">
+  <div class="prog-hd">
+    <span class="prog-lbl" id="progLbl">Preparing…</span>
+    <span class="prog-pct" id="progPct">0%</span>
+  </div>
+  <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+</div>
+
+<div class="preview-wrap" id="previewWrap">
+  <div class="preview-card">
+    <img id="previewImg" alt="Preview"/>
+    <div class="preview-actions">
+      <button class="ghost-btn" id="downloadBtn">⬇ Download</button>
+      <button class="ghost-btn" id="clipboardBtn">📋 Copy</button>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+<div class="ftr">
+  <span class="fl">SheetSnap © 2026 by @nikhilthakurnegi</span>
+  <span class="fr" id="frRight">Excel Add-in</span>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── Boot diagnostics ────────────────────────────────────
+  // Shows a clear, visible reason if anything fails to load, instead
+  // of a blank panel or a generic broken-content icon.
+  function showBootError(msg) {
+    const el = document.getElementById('bootError');
+    el.textContent = '⚠️ ' + msg;
+    el.style.display = 'block';
+  }
+
+  window.addEventListener('error', (e) => {
+    showBootError('A script failed to load or run: ' + (e.message || e.error || 'unknown error') +
+      '\n\nCheck: is taskpane.js hosted at the same URL as this page? Open this page directly in a browser tab to test.');
+  });
+
+  if (typeof Office === 'undefined') {
+    // Office.js script tag either didn't load or is blocked
+    setTimeout(() => {
+      if (typeof Office === 'undefined') {
+        showBootError('Office.js failed to load from appsforoffice.microsoft.com.\n\nThis usually means: (1) no internet connection, or (2) your network/firewall blocks that domain. This is unrelated to your own hosting.');
+      }
+    }, 4000);
+  } else {
+    setTimeout(() => {
+      if (!window.__sheetSnapReady) {
+        showBootError('Office.onReady() never fired within 6 seconds.\n\nMost likely cause: manifest.xml still contains "YOUR_HOSTED_URL" somewhere instead of your real hosted URL — double check every occurrence was replaced, then re-upload the manifest in Excel.');
+      }
+    }, 6000);
+  }
+</script>
+<script src="taskpane.js"></script>
+</body>
+</html>
